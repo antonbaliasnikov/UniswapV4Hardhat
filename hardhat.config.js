@@ -4,14 +4,27 @@ require("@nomiclabs/hardhat-ethers");
 require("solidity-coverage");
 require("hardhat-gas-reporter");
 require("hardhat-contract-sizer");
-// require("dotenv").config();
+require("dotenv").config();
 
 module.exports = {
-  defaultNetwork: "hardhat",
+  defaultNetwork: "boojumos",
   networks: {
     hardhat: {
       allowUnlimitedContractSize: true,
       chainId: 31337,
+    },
+    geth: {
+      allowUnlimitedContractSize: true,
+      url: "http://127.0.0.1:8545",
+      accounts: [process.env.WALLET_PRIVATE_KEY],
+      chainId: 9
+    },
+    boojumos: {
+      allowUnlimitedContractSize: true,
+      url: "http://127.0.0.1:3050",
+      ethNetwork: "http://127.0.0.1:8545",
+      accounts: [process.env.WALLET_PRIVATE_KEY],
+      chainId: 271
     },
   },
 

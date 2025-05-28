@@ -2,10 +2,7 @@ const { ethers } = require("hardhat");
 const { assert } = require("chai");
 const { calculateSqrtPriceX96 } = require("../utils/uniswapTools");
 const Big = require("big.js");
-const { hexlify } = require("ethers");
-const {
-  setBlockGasLimit,
-} = require("@nomicfoundation/hardhat-network-helpers");
+
 describe("Pool Test ", async function () {
   let poolManager;
   let GNOME;
@@ -17,7 +14,11 @@ describe("Pool Test ", async function () {
     accounts = await ethers.getSigners(); // could also do with getNamedAccounts
     deployer = accounts[0];
     user = accounts[1];
-    await deployments.fixture(["Local"]);
+    console.log(`Deployer: ${deployer.address}`);
+
+    //await deployments.fixture(["tokens"]);
+    //await deployments.fixture(["local"]);
+  
     poolManager = await ethers.getContract("PoolManager");
     GNOME = await ethers.getContract("GNOME");
     await GNOME.mint();
@@ -32,11 +33,12 @@ describe("Pool Test ", async function () {
     uniswapInteract = await ethers.getContract("UniswapInteract");
     hookFactory = await ethers.getContract("UniswapHooksFactory");
   });
-  it("can initialze my own pool with no hooks", async () => {
+  it.only("can initialze my own pool with no hooks", async () => {
     //Using no hook for this test
     const hook = "0x0000000000000000000000000000000000000000";
 
     const addresses = [EPICDAI.target, GNOME.target];
+    console.log(`Token addresses: ${addresses}`);
     //Make sure that addresses are sorted!
     addresses.sort();
 
@@ -51,7 +53,9 @@ describe("Pool Test ", async function () {
     //Calculate the starting price with (price, decimals in token0, decimals in token1)
     const sqrtPrice = calculateSqrtPriceX96(1, 18, 18);
 
-    await poolManager.initialize(poolKey, sqrtPrice.toFixed(), "0x");
+    const initTx = await poolManager.initialize(poolKey, sqrtPrice.toFixed(), "0x");
+    await initTx.wait();
+  
     //Below the bounds are defined for the position
     const lowerBound = 0 - 60 * 10;
     const upperBound = 0 + 60 * 10;
@@ -63,6 +67,7 @@ describe("Pool Test ", async function () {
     };
 
     let timeStamp = (await ethers.provider.getBlock("latest")).timestamp;
+    console.log("timestamp: ", timeStamp);
 
     const poolID = await uniswapInteract.getID(poolKey);
     let liq = await poolManager.getLiquidity(poolID);
@@ -89,16 +94,25 @@ describe("Pool Test ", async function () {
     ModifyPositionParams.liquidityDelta = liquidity.toString();
 
     //With the UniswapInteract code, one must approve of the token and amount beforehand
-    await GNOME.approve(uniswapInteract.target, token0Amount.toFixed());
-    await EPICDAI.approve(uniswapInteract.target, token1Amount.toFixed());
+    await (await GNOME.approve(uniswapInteract.target, token0Amount.toFixed())).wait();
+    await (await EPICDAI.approve(uniswapInteract.target, token1Amount.toFixed())).wait();
+
+    const gnome_allowance = await GNOME.allowance(deployer.address, uniswapInteract.target);
+    console.log(`GNOME Allowance: ${ethers.formatUnits(gnome_allowance, 18)} tokens`);
+    const epi_allowance = await EPICDAI.allowance(deployer.address, uniswapInteract.target);
+    console.log(`EPICDAI Allowance: ${ethers.formatUnits(epi_allowance, 18)} tokens`);
+
     console.log(`Adding liquidity...`);
     //The poolKey is used to identify the pair and the timeStamp + 100 is the deadline
-    await uniswapInteract.addLiquidity(
+    const addLiqTx = await uniswapInteract.addLiquidity(
       poolKey,
       ModifyPositionParams,
-      timeStamp + 100
+      timeStamp + 10000
     );
+    console.log("Add liquidity tx sent");
+    await addLiqTx.wait();
     console.log(`Liquidity added!`);
+
     liq = await poolManager.getLiquidity(poolID);
     console.log(`The pool now has ${liq.toString()} in liquidity`);
     const swapAmount = new Big("10").times(decimalAdj);
@@ -118,16 +132,19 @@ describe("Pool Test ", async function () {
 
     let token0BalBefore = await Token0.balanceOf(deployer.address);
     token0BalBefore = new Big(token0BalBefore.toString());
+    console.log("Token0 balance before swap: ", token0BalBefore.toFixed());
 
     //With the UniswapInteract code, one must approve of the token and amount beforehand
-    await Token0.approve(uniswapInteract.target, swapAmount.toFixed());
-    await Token1.approve(uniswapInteract.target, 0);
+    await (await Token0.approve(uniswapInteract.target, swapAmount.toFixed())).wait();
+    await (await Token1.approve(uniswapInteract.target, 0)).wait();
+
     console.log(`Swapping Gnome --> EpicDai`);
-    await uniswapInteract.swap(poolKey, SwapParams, timeStamp + 100);
+    await (await uniswapInteract.swap(poolKey, SwapParams, timeStamp + 10000)).wait();
     console.log(`Swap finished!\n`);
 
     let token0BalAfter = await Token0.balanceOf(deployer.address);
     token0BalAfter = new Big(token0BalAfter.toString());
+    console.log("Token0 balance after swap: ", token0BalAfter.toFixed());
 
     assert.equal(
       token0BalBefore.toFixed(),
@@ -138,24 +155,24 @@ describe("Pool Test ", async function () {
     const token1Donation = new Big("10").times(decimalAdj);
 
     //With the UniswapInteract code, one must approve of the token and amount beforehand
-    await EPICDAI.approve(uniswapInteract.target, token0Donation.toFixed());
-    await GNOME.approve(uniswapInteract.target, token1Donation.toFixed());
+    await (await EPICDAI.approve(uniswapInteract.target, token0Donation.toFixed())).wait();
+    await (await GNOME.approve(uniswapInteract.target, token1Donation.toFixed())).wait();
 
     console.log(`Donating towards the pool...`);
-    await uniswapInteract.donate(
+    await (await uniswapInteract.donate(
       poolKey,
       token0Donation.toFixed(),
       token1Donation.toFixed(),
-      timeStamp + 100
-    );
+      timeStamp + 10000
+    )).wait();
     console.log(`Donation finished!`);
     console.log(`Closing position...`);
-    await uniswapInteract.closePosition(
+    await (await uniswapInteract.closePosition(
       poolKey,
       lowerBound,
       upperBound,
-      timeStamp + 100
-    );
+      timeStamp + 10000
+    )).wait();
     console.log(`Position closed`);
     liq = await poolManager.getLiquidity(poolID);
 
@@ -181,7 +198,7 @@ describe("Pool Test ", async function () {
       DYNAMIC_FEE_FLAG + HOOK_SWAP_FEE_FLAG + HOOK_WITHDRAW_FEE_FLAG;
     //To set protocl fees it mus be done here
 
-    await poolManager.setProtocolFeeController(hook);
+    await (await poolManager.setProtocolFeeController(hook)).wait();
 
     const poolKey = {
       currency0: addresses[0].toString().trim(),
@@ -192,7 +209,7 @@ describe("Pool Test ", async function () {
     };
     const sqrtPrice = calculateSqrtPriceX96(1, 18, 18);
 
-    await poolManager.initialize(poolKey, sqrtPrice.toFixed(), "0x");
+    await (await poolManager.initialize(poolKey, sqrtPrice.toFixed(), "0x")).wait();
     //Below the bounds are defined for the position
     const lowerBound = 0 - 60 * 10;
     const upperBound = 0 + 60 * 10;
@@ -230,15 +247,15 @@ describe("Pool Test ", async function () {
     ModifyPositionParams.liquidityDelta = liquidity.toString();
 
     //With the UniswapInteract code, one must approve of the token and amount beforehand
-    await GNOME.approve(uniswapInteract.target, token0Amount.toFixed());
-    await EPICDAI.approve(uniswapInteract.target, token1Amount.toFixed());
+    await (await GNOME.approve(uniswapInteract.target, token0Amount.toFixed())).wait();
+    await (await EPICDAI.approve(uniswapInteract.target, token1Amount.toFixed())).wait();
     console.log(`Adding liquidity...`);
     //The poolKey is used to identify the pair and the timeStamp + 100 is the deadline
-    await uniswapInteract.addLiquidity(
+    await (await uniswapInteract.addLiquidity(
       poolKey,
       ModifyPositionParams,
-      timeStamp + 100
-    );
+      timeStamp + 10000
+    )).wait();
     console.log(`Liquidity added!`);
     liq = await poolManager.getLiquidity(poolID);
     console.log(`The pool now has ${liq.toString()} in liquidity\n`);
@@ -261,10 +278,10 @@ describe("Pool Test ", async function () {
     token0BalBefore = new Big(token0BalBefore.toString());
 
     //With the UniswapInteract code, one must approve of the token and amount beforehand
-    await Token0.approve(uniswapInteract.target, swapAmount.toFixed());
-    await Token1.approve(uniswapInteract.target, 0);
+    await (await Token0.approve(uniswapInteract.target, swapAmount.toFixed())).wait();
+    await (await Token1.approve(uniswapInteract.target, 0)).wait();
     console.log(`Swapping Gnome --> EpicDai`);
-    await uniswapInteract.swap(poolKey, SwapParams, timeStamp + 100);
+    await (await uniswapInteract.swap(poolKey, SwapParams, timeStamp + 10000)).wait();
     console.log(`Swap finished!\n`);
 
     let token0BalAfter = await Token0.balanceOf(deployer.address);
@@ -279,24 +296,24 @@ describe("Pool Test ", async function () {
     const token1Donation = new Big("10").times(decimalAdj);
 
     //With the UniswapInteract code, one must approve of the token and amount beforehand
-    await EPICDAI.approve(uniswapInteract.target, token0Donation.toFixed());
-    await GNOME.approve(uniswapInteract.target, token1Donation.toFixed());
+    await (await EPICDAI.approve(uniswapInteract.target, token0Donation.toFixed())).wait();
+    await (await GNOME.approve(uniswapInteract.target, token1Donation.toFixed())).wait();
 
     console.log(`Donating towards the pool...`);
-    await uniswapInteract.donate(
+    await (await uniswapInteract.donate(
       poolKey,
       token0Donation.toFixed(),
       token1Donation.toFixed(),
-      timeStamp + 100
-    );
+      timeStamp + 10000
+    )).wait();
     console.log(`Donation finished!\n`);
     console.log(`Closing position...`);
-    await uniswapInteract.closePosition(
+    await (await uniswapInteract.closePosition(
       poolKey,
       lowerBound,
       upperBound,
-      timeStamp + 100
-    );
+      timeStamp + 10000
+    )).wait();
     console.log(`Position closed`);
     liq = await poolManager.getLiquidity(poolID);
 

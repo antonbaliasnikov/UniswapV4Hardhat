@@ -53,4 +53,4 @@ module.exports = async function ({ getNamedAccounts, deployments }) {
   //   );
   // }
 };
-module.exports.tags = ["all", "Need", "Local"];
+module.exports.tags = ["all", "local"];

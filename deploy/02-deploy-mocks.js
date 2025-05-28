@@ -27,4 +27,4 @@ module.exports = async function ({ getNamedAccounts, deployments }) {
   //     await verify(HOG.address, args, "contracts/Mocks/Hog.sol:HOG");
   //   }
 };
-module.exports.tags = ["all", "Tokens", "Local"];
+module.exports.tags = ["all", "tokens"];
