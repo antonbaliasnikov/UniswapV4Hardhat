@@ -33,7 +33,7 @@ describe("Pool Test ", async function () {
     uniswapInteract = await ethers.getContract("UniswapInteract");
     hookFactory = await ethers.getContract("UniswapHooksFactory");
   });
-  it.only("can initialze my own pool with no hooks", async () => {
+  it("can initialze my own pool with no hooks", async () => {
     //Using no hook for this test
     const hook = "0x0000000000000000000000000000000000000000";
 
