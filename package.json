@@ -16,5 +16,11 @@
     "hardhat-gas-reporter": "^1.0.9",
     "solhint": "^3.6.2",
     "solidity-coverage": "^0.8.4"
+  },
+  "scripts": {
+    "clean": "hardhat clean",
+    "compile": "hardhat compile",
+    "deploy": "hardhat deploy --network ${NETWORK_NAME} --tags local && hardhat deploy --network ${NETWORK_NAME}  --tags tokens",
+    "test": "hardhat test --network ${NETWORK_NAME}"
   }
 }

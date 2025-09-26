@@ -16,20 +16,26 @@ module.exports = {
     geth: {
       allowUnlimitedContractSize: true,
       url: "http://127.0.0.1:8545",
-      accounts: [process.env.WALLET_PRIVATE_KEY],
+      accounts: [process.env.PRIVATE_KEY],
       chainId: 9
     },
     boojumos: {
       allowUnlimitedContractSize: true,
       url: "http://127.0.0.1:3050",
       ethNetwork: "http://127.0.0.1:8545",
-      accounts: [process.env.WALLET_PRIVATE_KEY],
-      chainId: 271
+      accounts: [process.env.PRIVATE_KEY],
+      chainId: 270
+    },
+    [process.env.NETWORK_NAME || "ZKsyncOS"]: {
+      chainId: process.env.CHAIN_ID ? parseInt(process.env.CHAIN_ID) : 270,
+      url: process.env.RPC_URL || "",
+      allowUnlimitedContractSize: true,
+      accounts: [process.env.PRIVATE_KEY || ""],
     },
     zksyncOSTestnet: {
       allowUnlimitedContractSize: true,
       url: "https://zksync-os-testnet-alpha.zksync.dev",
-      accounts: [process.env.WALLET_PRIVATE_KEY],
+      accounts: [process.env.PRIVATE_KEY || ""],
       chainId: 8022833
     }
   },
