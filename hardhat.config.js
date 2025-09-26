@@ -26,6 +26,12 @@ module.exports = {
       accounts: [process.env.WALLET_PRIVATE_KEY],
       chainId: 271
     },
+    zksyncOSTestnet: {
+      allowUnlimitedContractSize: true,
+      url: "https://zksync-os-testnet-alpha.zksync.dev",
+      accounts: [process.env.WALLET_PRIVATE_KEY],
+      chainId: 8022833
+    }
   },
 
   namedAccounts: {
@@ -51,6 +57,6 @@ module.exports = {
     ],
   },
   mocha: {
-    timeout: 30000, // 500 seconds max for running tests
+    timeout: 300000, // 500 seconds max for running tests
   },
 };
