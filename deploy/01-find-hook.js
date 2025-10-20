@@ -1,56 +1,51 @@
-const { network } = require("hardhat");
-const { verify } = require("../utils/verify.js");
-const { ethers } = require("hardhat");
+const { ethers, network } = require("hardhat");
 
-module.exports = async function ({ getNamedAccounts, deployments }) {
-  const { deploy, log } = deployments;
+module.exports = async function ({ getNamedAccounts }) {
   const { deployer } = await getNamedAccounts();
   const chainId = network.config.chainId;
 
   const owner = deployer;
   const poolManager = await ethers.getContract("PoolManager");
-  const uniswapInteract = await ethers.getContract("UniswapInteract");
-
   const hookFactory = await ethers.getContract("UniswapHooksFactory");
 
-  //salt is the random number added to the address
-  let salt;
-  //The final address is the one that matches the correct prefix
-  let finalAddress;
-  //The desired prefix is set here
-  const correctPrefix = 0xff;
+  // Set this to the byte your hook requires.
+  // In your previous script you used 0xff (all callbacks). Adjust if your hook uses fewer.
+  const requiredFirstByte = "ff";    // e.g. "ff", "3c", "00", etc.
+  const limit = 5000;                // search budget; ~256 tries expected for 1 byte
 
-  //The code loops through the salts below
-  // - If the address is not found, increase the length of search( e.g i < 2000) and ensure that prefix is possible
+  let foundSalt = null;
+  let preAddr = null;
 
-  for (let i = 0; i < 2000; i++) {
-    salt = ethers.toBeHex(i);
-    //console.log(salt);
-    salt = ethers.zeroPadValue(salt, 32);
+  for (let i = 0; i < limit; i++) {
+    const salt = ethers.zeroPadValue(ethers.toBeHex(i), 32);
 
-    let expectedAddress = await hookFactory.getPrecomputedHookAddress(
+    const addr = (await hookFactory.getPrecomputedHookAddress(
       owner,
       poolManager.target,
       salt
-    );
-    finalAddress = expectedAddress;
-    //console.log(i, "Address:", expectedAddress);
-    expectedAddress = expectedAddress;
-    //This console.log() prints all of the generated addresses
-    console.log(finalAddress);
-    if (_doesAddressStartWith(expectedAddress, correctPrefix)) {
-      console.log("This is the correct salt:", salt);
-      break;
+    )).toLowerCase();
+
+    if (addr.slice(2, 4) === requiredFirstByte) {
+      // extra safety: make sure nothing is already deployed there
+      const code = await ethers.provider.getCode(addr);
+      if (code === "0x") {
+        foundSalt = salt;
+        preAddr = addr;
+        break;
+      }
     }
   }
 
-  function _doesAddressStartWith(_address, _prefix) {
-    // console.log(_address.substring(0, 4), ethers.toBeHex(_prefix).toString());
-    return _address.substring(0, 4) == ethers.toBeHex(_prefix).toString();
+  if (!foundSalt) {
+    throw new Error(
+      `Could not find a salt that yields first byte 0x${requiredFirstByte} within ${limit} attempts`
+    );
   }
 
-  await hookFactory.deploy(poolManager.target, salt);
-  console.log("Hooks deployed with address:", finalAddress);
+  console.log("Precomputed hook address:", preAddr);
+  const tx = await hookFactory.deploy(poolManager.target, foundSalt);
+  await tx.wait();
+  console.log("Hooks deployed at:", preAddr);
   console.log("Chain", chainId);
 };
 module.exports.tags = ["all", "local"];
