@@ -16,7 +16,7 @@ module.exports = async function ({ getNamedAccounts, deployments }) {
     from: deployer,
     args: args,
     log: true,
-    blockConfirmations: 2,
+    blockConfirmations: 1,
   });
 
   args = [PoolManager.address];
@@ -24,7 +24,7 @@ module.exports = async function ({ getNamedAccounts, deployments }) {
     from: deployer,
     args: args,
     log: true,
-    blockConfirmations: 2,
+    blockConfirmations: 1,
   });
   // if (chainId != 31337 && process.env.ETHERSCAN_API_KEY) {
   //   log("Verifying...");
@@ -40,7 +40,7 @@ module.exports = async function ({ getNamedAccounts, deployments }) {
     from: deployer,
     args: args,
     log: true,
-    blockConfirmations: 2,
+    blockConfirmations: 1,
   });
 
   console.log("Chain", chainId);
